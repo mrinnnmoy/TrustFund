@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TrustFund — UI Kit Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap"
+    rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../brand/tokens.css" />
+  <style>
+    body {
+      background: var(--color-paper);
+      color: var(--color-ink);
+      font-family: var(--font-body);
+    }
+
+    .mono {
+      font-family: var(--font-mono);
+    }
+  </style>
+</head>
+
+<body class="mx-auto max-w-4xl space-y-12 p-6 md:p-10">
+  <header class="flex items-center gap-3 border-b pb-8" style="border-color:var(--color-border)">
+    <img src="../brand/logo-icon.svg" width="42" height="42" alt="TrustFund" />
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight">TrustFund UI Kit</h1>
+      <p class="text-sm" style="color:var(--color-muted)">Core primitives for the fundraising experience.</p>
+    </div>
+  </header>
+
+  <section class="space-y-4">
+    <h2 class="text-lg font-semibold">Buttons</h2>
+    <div class="flex flex-wrap gap-3">
+      <button class="rounded-full px-5 py-2.5 text-sm font-semibold transition-colors"
+        style="background:var(--color-accent);color:var(--color-ink)">Donate</button>
+      <button class="rounded-full border px-5 py-2.5 text-sm font-semibold"
+        style="border-color:var(--color-ink);color:var(--color-ink)">View campaign</button>
+      <button class="rounded-full px-5 py-2.5 text-sm font-semibold" style="color:var(--color-ink)">Cancel</button>
+    </div>
+  </section>
+
+  <section class="space-y-4">
+    <h2 class="text-lg font-semibold">Input</h2>
+    <div class="max-w-sm space-y-1.5">
+      <label class="text-sm font-medium">Campaign title</label>
+      <input class="w-full rounded-[10px] border px-3.5 py-2.5 text-sm outline-none"
+        style="border-color:var(--color-border);background:var(--color-paper)" placeholder="Clean water for..." />
+    </div>
+  </section>
+
+  <section class="space-y-4">
+    <h2 class="text-lg font-semibold">Card + Progress</h2>
+    <div class="max-w-md rounded-2xl border p-6" style="border-color:var(--color-border);background:var(--color-paper)">
+      <div class="mb-5 h-36 rounded-xl" style="background:var(--gradient-accent)"></div>
+      <h3 class="mb-1 text-lg font-semibold">Clean Water Initiative</h3>
+      <p class="mb-5 text-sm" style="color:var(--color-muted)">Funding a well for a village in rural Odisha.</p>
+      <div class="mb-2 h-2 w-full overflow-hidden rounded-full" style="background:var(--color-ink-10)">
+        <div class="h-full rounded-full" style="width:42%;background:var(--color-accent)"></div>
+      </div>
+      <span class="mono text-xs">4.2 / 10 SOL</span>
+    </div>
+  </section>
+
+  <section class="space-y-4">
+    <h2 class="text-lg font-semibold">Badges</h2>
+    <div class="flex flex-wrap gap-2">
+      <span class="rounded-full px-3 py-1 text-xs font-semibold" style="background:var(--color-ink-05)">Draft</span>
+      <span class="rounded-full px-3 py-1 text-xs font-semibold" style="background:var(--color-accent)">Active</span>
+      <span class="rounded-full px-3 py-1 text-xs font-semibold" style="background:var(--color-accent-soft)">Closing
+        soon</span>
+    </div>
+  </section>
+
+  <section class="space-y-3 rounded-2xl p-6" style="background:var(--color-surface)">
+    <h2 class="text-lg font-semibold">On-chain data type test</h2>
+    <p class="text-sm">Donor <span class="mono">7xKX...9pQ2</span> gave <span class="mono">1.5 SOL</span> on <span
+        class="mono">2026-09-18 14:02 UTC</span>.</p>
+  </section>
+</body>
+
+</html>

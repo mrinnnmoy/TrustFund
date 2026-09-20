@@ -1,6 +1,20 @@
 # TrustFund.
 
-> A transparent, on-chain donation platform built on Solana. Create campaigns, accept $SOL contributions and withdraw funds. All trustlessly via Anchor smart contracts.
+> A transparent, on-chain donation platform built on Solana.
+>
+> - Create campaigns,
+> - Accept $SOL contributions &
+> - Withdraw funds.
+>
+> All trustlessly via Anchor smart contracts.
+
+---
+
+## Demo
+
+🎥 **Demo Video:** [Watch TrustFund on YouTube]()
+
+> Demoed on Solana Devnet.
 
 ---
 
@@ -23,18 +37,21 @@
 
 ## 1. Overview
 
-| Field              | Detail                                                                              |
-| ------------------ | ----------------------------------------------------------------------------------- |
-| **Project name**   | TrustFund                                                                           |
-| **Type**           | Test project #1. (Solana sandbox) Kosmos                                            |
-| **Tagline**        | Crypto fundraising, transparently.                                                  |
-| **Chain**          | Solana (devnet)                                                                     |
-| **Core value**     | On-chain campaign creation, SOL donations and trustless withdrawals via Anchor.     |
-| **Primary stack**  | Next.js 14 · Anchor · @solana/web3.js · Solana Wallet Adapter · IPFS · Tailwind CSS |
-| **Timeline**       | 1–2 weeks (keep it simple — devnet only)                                            |
-| **Marketing site** | `trustfund.cc` — landing page, how it works, CTA to launch app                      |
-| **App**            | `app.trustfund.cc` — the full dApp, wallet connection required for write actions    |
-| **Deployment**     | Vercel (marketing + app frontend) · Solana devnet (Anchor program)                  |
+| Field             | Detail                                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------------ |
+| **Project name**  | TrustFund                                                                                        |
+| **Type**          | Campaign management + Escrowed SOL donations + Onchain donor tracking                            |
+| **Core value**    | On-chain campaign creation, SOL donations and owner withdrawal. Enforced by Anchor.              |
+| **Tag line**      | Crypto fundraising, transparently.                                                               |
+| **Chain**         | Solana (devnet)                                                                                  |
+| **Timeline**      | September 18 – October 07, 2026                                                                  |
+| **Primary stack** | Next.js 16 · Anchor 1.1 · Solana Kit · Wallet Standard · Codama · Pinata · Tailwind CSS v4       |
+| **App**           | Single Next.js app with public marketing/landing at `/` & full dApp behind it. No monorepo split |
+| **Deployment**    | Vercel (frontend) · Solana devnet (Anchor program) · Supabase (Postgres, for indexed data)       |
+
+> **Not an escrow.** TrustFund does not hold donors' funds in trust pending success.
+>
+> Once a donation is sent, it belongs to the campaign. The owner can withdraw it after the deadline whether or not the goal was met. There are no refunds. This is a deliberate scope decision, not an oversight. See [Section 4](#4-feature-scope).
 
 ---
 
@@ -48,18 +65,39 @@ Traditional platforms don't support crypto natively and most existing Web3 donat
 
 ### The Solution
 
-**TrustFund** is a Solana-based donation platform that uses Anchor smart contracts to manage campaigns and funds entirely on-chain.
+**TrustFund** is a Solana-based donation platform that uses an Anchor smart contract to manage campaigns and funds entirely on-chain.
 
-Every campaign creation, donation and withdrawal is publicly verifiable on the Solana blockchain. No intermediaries, no hidden fees, no trust required.
+Every campaign creation, donation and withdrawal is publicly verifiable on the Solana blockchain
+
+- No intermediaries,
+- no hidden fees,
+- no trust required about _where the money is_.
+
+Only about what happens to it after the deadline, which is stated up front.
 
 Here's how it works:
 
-1. **Campaign creation** — users create a fundraising campaign with a title, description, cover image (uploaded to IPFS), SOL goal, and deadline. Campaign data is stored in a PDA-based on-chain account with the IPFS image CID stored on-chain.
-2. **SOL donations** — donors contribute SOL directly to the campaign's PDA vault via a secure Anchor instruction. A `DonationRecord` PDA is created per donation storing the donor address, amount, and timestamp.
-3. **Donation pooling** — funds are held in the PDA vault rather than transferred instantly, giving the campaign owner controlled access.
-4. **Campaign deadlines** — each campaign has a deadline. Once it passes, the campaign auto-closes and no further donations are accepted.
-5. **Fund withdrawal** — the campaign creator can withdraw pooled SOL once the campaign is closed. Only the campaign owner's wallet can trigger this — enforced by Anchor constraints.
-6. **On-chain transparency** — all campaign accounts are publicly readable on Solana. Helius webhooks index donation events to power the donor leaderboard and history queries.
+1. **Campaign creation** : A user creates a fundraising campaign with a title, description, cover image (uploaded to IPFS), SOL goal and deadline.
+
+   Each wallet can create any number of campaigns. A `UserProfile` PDA tracks a running campaign counter so campaign PDAs never collide.
+
+2. **SOL donations** : Donors contribute SOL directly to the campaign's dedicated vault PDA via a secure Anchor instruction.
+
+   A `DonationRecord` PDA accumulates each donor's total per campaign. One record per donor per campaign, not one per donation.
+
+3. **Fund holding** : Donated SOL sits in a vault PDA that holds no account data, only lamports.
+
+   This keeps it a plain system-owned account, so SOL can move in and out via ordinary System Program transfers with no rent-exemption complications.
+
+4. **Campaign deadlines** : Each campaign has a deadline. The `donate` instruction rejects any contribution after it passes.
+
+5. **Fund withdrawal** : After the deadline, the campaign owner can withdraw everything in the vault in one instruction.
+
+   No separate "close" step. The deadline check happens inline in `withdraw`. Only the owner's wallet can trigger this, enforced by Anchor's `has_one` constraint.
+
+6. **On-chain transparency** : All campaign and donation accounts are publicly readable on Solana at any time via `getProgramAccounts`.
+
+   A Helius webhook additionally indexes events into Postgres so the leaderboard and donor history load fast without hammering the RPC.
 
 ---
 
@@ -67,7 +105,7 @@ Here's how it works:
 
 | User type         | Role                                                                  |
 | ----------------- | --------------------------------------------------------------------- |
-| Campaign creators | Create a fundraising campaign & withdraw funds on completion          |
+| Campaign creators | Create fundraising campaigns & withdraw funds after the deadline      |
 | Donors            | Browse active campaigns & contribute SOL                              |
 | General public    | View campaign progress, on-chain donation history & donor leaderboard |
 
@@ -77,16 +115,23 @@ Here's how it works:
 
 ### ✅ Build in MVP
 
-- **Create a campaign** : Title, description, SOL goal, cover image (uploaded to IPFS), stored in a PDA account
-- **Browse all active campaigns** : List page with cover images and progress indicators
-- **Campaign detail page** : Cover image, description, total raised, goal, owner wallet
-- **Donate SOL to a campaign** : Sign and send transaction via wallet adapter
-- **Withdraw funds** : Campaign owner only, enforced on-chain by Anchor constraints
-- **Connect wallet** : Phantom via Solana Wallet Adapter
+- **Create a campaign** : Title, description, SOL goal, cover image (uploaded to IPFS), stored in a counter-seeded PDA. One wallet, many campaigns.
+- **Browse all campaigns** : List page with cover images and progress indicators.
+- **Campaign detail page** : Cover image, description, total raised, goal, owner wallet, deadline countdown.
+- **Donate SOL to a campaign** : Sign and send transaction via Wallet Standard.
+- **Withdraw funds** : Campaign owner only, after deadline, enforced on-chain. One instruction, no separate close step.
+- **Connect wallet** : Any Wallet Standard wallet (Phantom, Solflare, Backpack). No per-wallet adapter packages.
 - Deploy program to Solana (**devnet**)
-- **Indexing with Helius webhooks** : Index campaign creation and donation events for fast data retrieval
-- **Campaign deadlines and auto-close logic** : Campaigns have an end date, auto-close when deadline passes
-- **Donor leaderboard** : Ranked list of donors showing wallet address and total SOL donated across all campaigns. Clicking a donor address opens a detail panel showing every campaign they have donated to, the amount donated, and the transaction timestamp
+- **Indexing** : Helius webhook → Postgres, with a `getProgramAccounts` fallback so pages never depend solely on the indexer being healthy.
+- **Campaign deadlines** : Donations rejected after the deadline; No auto-close transaction needed.
+- **Donor leaderboard** : Ranked list of donors by total SOL donated across all campaigns. Clicking a donor opens a panel showing every campaign they've donated to and their running total per campaign.
+
+### ❌ Explicitly out of scope for MVP
+
+- **Refunds.** If a campaign misses its goal, donations are not returned. This is a stated product decision, not a missing feature. See the note in [Section 1](#1-overview).
+- **A separate `close_campaign` instruction.** The deadline check lives inline in `withdraw` instead.
+- Multi-token donations (SPL tokens) — SOL only.
+- Campaign editing after creation.
 
 ---
 
@@ -94,81 +139,95 @@ Here's how it works:
 
 ### Frontend
 
-| Tool                    | Purpose                                                                       |
-| ----------------------- | ----------------------------------------------------------------------------- |
-| Next.js 14 (App Router) | First Next.js project — SSR for public campaign pages, App Router for layouts |
-| TypeScript              | Type safety across the frontend                                               |
-| Tailwind CSS            | Utility-first styling                                                         |
-| Solana Wallet Adapter   | Wallet connection — Phantom support, provider setup                           |
-| @solana/web3.js         | Read on-chain data, build and send transactions                               |
-| @coral-xyz/anchor       | Anchor client — load IDL, call program instructions from the frontend         |
-| Pinata SDK              | Upload campaign cover images to IPFS — returns a CID stored on-chain          |
+| Tool                    | Purpose                                                                               |
+| ----------------------- | ------------------------------------------------------------------------------------- |
+| Next.js 16 (App Router) | Current LTS. SSR for public campaign pages, App Router for layouts                    |
+| TypeScript              | Type safety across the frontend                                                       |
+| Tailwind CSS v4         | Utility-first styling, CSS-first config                                               |
+| `@solana/kit`           | Core SDK — RPC, transaction building, sending. Replaces `@solana/web3.js` v1          |
+| `@solana/react`         | React hooks + Wallet Standard discovery. Replaces `@solana/wallet-adapter-*` entirely |
+| Codama-generated client | Typed instruction builders + account decoders, generated from the Anchor IDL          |
+| `pinata` (v2 SDK)       | Upload campaign cover images to IPFS. Returns a CID stored on-chain                   |
+
+> **No `@coral-xyz/anchor` in the frontend at all.** Codama converts the Anchor IDL into a Kit-native client at build time. The app never imports Anchor, only the generated client and Kit itself.
 
 ### Indexing
 
-| Tool   | Purpose                                                                                                                                                                      |
-| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Helius | Webhook-based Solana event indexing. Listens to campaign creation and donation events, feeds a lightweight off-chain store for fast leaderboard and donation history queries |
+| Tool                           | Purpose                                                                                                   |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| Helius (devnet RPC + webhooks) | RPC provider (faster/more reliable than the public devnet endpoint) and webhook source for program events |
+| Supabase (Postgres)            | Stores indexed campaigns and donations for fast leaderboard/history queries                               |
+| Drizzle ORM                    | Typed SQL queries and migrations against the Supabase Postgres instance                                   |
+| Backfill script                | Replays full program history from RPC on demand, webhooks can drop events, this keeps the DB honest       |
 
-### Smart Contracts
+> **The database is a cache, never a source of truth.** Every read path has a fallback to `getProgramAccounts` directly against chain state, so a stale or empty DB degrades the leaderboard's speed, not its correctness.
 
-| Tool                | Purpose                                                             |
-| ------------------- | ------------------------------------------------------------------- |
-| Rust                | Language for writing Anchor programs                                |
-| Anchor              | Framework — account validation, instruction routing, error handling |
-| Solana CLI          | Local validator, program deployment, account inspection             |
-| Anchor Test (Mocha) | TypeScript-based integration tests for all program instructions     |
+### Smart Contract
+
+| Tool       | Purpose                                                                   |
+| ---------- | ------------------------------------------------------------------------- |
+| Rust       | Language for the Anchor program                                           |
+| Anchor 1.1 | Framework — account validation, instruction routing, error handling       |
+| Solana CLI | Local validator fallback, program deployment, account inspection          |
+| LiteSVM    | Fast Rust unit tests with direct clock control. Needed for deadline logic |
+| Surfpool   | Anchor 1.x's local test validator replacement, for TS integration tests   |
 
 ### DevOps
 
-| Tool           | Purpose                                                                        |
-| -------------- | ------------------------------------------------------------------------------ |
-| Vercel         | Two deployments from one repo — marketing site + dApp frontend, both free tier |
-| Solana devnet  | Program deployment — free, public, no real funds                               |
-| GitHub Actions | CI — lint and type-check on every push                                         |
+| Tool           | Purpose                                                         |
+| -------------- | --------------------------------------------------------------- |
+| Vercel         | Single deployment. Next.js frontend + API routes, free tier     |
+| Solana devnet  | Program deployment. Free, public, no real funds                 |
+| GitHub Actions | CI. (lint, type-check & Codama-client-is-current check on push) |
 
 ---
 
 ## 6. System Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                           FRONTEND                               │
-│                 Next.js 14 App Router (Vercel)                   │
-│    Solana Wallet Adapter · @solana/web3.js · Anchor · Pinata     │
-│                                                                  │
-│   trustfund.cc (marketing)       app.trustfund.cc (dApp)         │
-└──────────┬───────────────────────────────────┬───────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│                             FRONTEND                               │
+│                  Next.js 16 App Router (Vercel)                    │
+│         @solana/kit · @solana/react · Codama client · Pinata       │
+│                                                                    │
+│                trustfund.vercel.app  (single app, all routes)      │
+└──────────┬───────────────────────────────────┬─────────────────────┘
            │ image uploads                     │ RPC + signed txns
-┌──────────▼──────────┐            ┌───────────▼──────────────────┐
-│        IPFS         │            │         SOLANA DEVNET         │
-│    (via Pinata)     │            │                               │
-│                     │            │  ┌────────────────────────┐   │
-│  Campaign cover     │            │  │  TrustFund Anchor      │   │
-│  images stored      │            │  │  Program               │   │
-│  as CID hash        │            │  │                        │   │
-│  referenced         │            │  │  Instructions:         │   │
-│  on-chain           │            │  │  • create_campaign     │   │
-└─────────────────────┘            │  │  • donate              │   │
-                                   │  │  • close_campaign      │   │
-                                   │  │  • withdraw            │   │
-                                   │  │                        │   │
-                                   │  │  PDAs:                 │   │
-                                   │  │  • CampaignAccount     │   │
-                                   │  │  • DonationRecord      │   │
-                                   │  └────────────────────────┘   │
-                                   │                               │
-                                   │  All state publicly readable  │
-                                   └──────────────┬────────────────┘
-                                                  │ webhook events
-                                   ┌──────────────▼────────────────┐
-                                   │            HELIUS              │
-                                   │                               │
-                                   │  Indexes campaign creation    │
-                                   │  and donation events →        │
-                                   │  feeds leaderboard and        │
-                                   │  donation history queries     │
-                                   └───────────────────────────────┘
+┌──────────▼──────────┐            ┌───────────▼───────────────────────┐
+│        IPFS         │            │          SOLANA DEVNET            │
+│    (via Pinata)     │            │        (RPC via Helius)           │
+│                     │            │                                   │
+│  Campaign cover     │            │  ┌─────────────────────────────┐  │
+│  images stored      │            │  │   TrustFund Anchor Program  │  │
+│  as CID hash        │            │  │                             │  │
+│  referenced         │            │  │  Instructions:              │  │
+│  on-chain           │            │  │  • create_campaign          │  │
+└─────────────────────┘            │  │  • donate                   │  │
+                                   │  │  • withdraw                 │  │
+                                   │  │                             │  │
+                                   │  │  PDAs:                      │  │
+                                   │  │  • UserProfile              │  │
+                                   │  │  • CampaignAccount          │  │
+                                   │  │  • Vault (data-less)        │  │
+                                   │  │  • DonationRecord           │  │
+                                   │  └─────────────────────────────┘  │
+                                   │                                   │
+                                   │   All state publicly readable     │
+                                   │   via getProgramAccounts          │
+                                   └───────────────┬───────────────────┘
+                                                   │ webhook events
+                                   ┌───────────────▼───────────────────┐
+                                   │             HELIUS                │
+                                   │   Watches program ID, fires       │
+                                   │   webhook on every transaction    │
+                                   └───────────────┬───────────────────┘
+                                                   │
+                                   ┌───────────────▼────────────────────┐
+                                   │       SUPABASE (Postgres)          │
+                                   │   campaigns · donations tables     │
+                                   │   fed by webhook + backfill script │
+                                   │   → powers leaderboard, history    │
+                                   └────────────────────────────────────┘
 ```
 
 ### Transaction flow. (create campaign)
@@ -178,12 +237,14 @@ User fills campaign form + uploads cover image → clicks "Create Campaign"
 → Frontend sends image to Next.js API route: POST /api/upload
 → API route uploads image to IPFS via Pinata SDK (server-side, keys never exposed)
 → Pinata returns IPFS CID (content hash)
-→ Wallet Adapter prompts user to sign
-→ Frontend builds instruction: create_campaign(title, description, goal, image_cid, deadline)
-→ Anchor derives PDA: ["campaign", owner.publicKey]
-→ Transaction sent to devnet
+→ Wallet Standard prompts user to sign
+→ Frontend builds instruction via Codama client: create_campaign(title, description, image_cid, goal, deadline)
+→ Program derives/increments UserProfile PDA: ["user_profile", owner] — reads current campaign_count
+→ Program derives CampaignAccount PDA: ["campaign", owner, campaign_id.to_le_bytes()]
+→ Program derives Vault PDA: ["vault", campaign.key()] — data-less, holds lamports only
+→ Transaction sent to devnet via Kit
 → CampaignAccount PDA created on-chain (stores CID, not the image itself)
-→ Helius webhook fires — indexes the new campaign event
+→ Helius webhook fires — indexes the new campaign event into Postgres
 → Frontend redirects to campaign detail page
 → Campaign data read from PDA + cover image loaded from IPFS via CID
 ```
@@ -192,30 +253,32 @@ User fills campaign form + uploads cover image → clicks "Create Campaign"
 
 ```
 Donor clicks "Donate" → enters SOL amount
-→ Wallet Adapter prompts to sign
-→ Frontend builds instruction: donate(amount_in_lamports)
-→ Anchor validates: campaign is active, deadline not passed, amount > 0
-→ SOL transferred from donor wallet to campaign PDA vault
+→ Wallet Standard prompts to sign
+→ Frontend builds instruction via Codama client: donate(amount_in_lamports)
+→ Anchor validates: Clock::get()?.unix_timestamp < campaign.deadline
+→ SOL transferred from donor wallet to campaign's Vault PDA (System Program CPI)
 → CampaignAccount total_raised updated
-→ DonationRecord PDA created — stores donor pubkey, amount, timestamp
-→ Helius webhook fires — indexes the donation event for leaderboard
+→ DonationRecord PDA created (init_if_needed) or updated — accumulates total_amount,
+  donation_count, first_donated_at, last_donated_at for this donor + campaign pair
+→ Helius webhook fires — indexes the donation event for the leaderboard
 → Frontend re-reads PDA → progress bar and total raised update
 ```
 
-### Transaction flow. (close & withdraw)
+### Transaction flow. (withdraw)
 
 ```
-Deadline passes → anyone can call close_campaign
-→ Anchor validates: clock.unix_timestamp >= campaign.deadline
-→ campaign.is_closed set to true
-
-Campaign owner clicks "Withdraw Funds"
-→ Wallet Adapter prompts to sign
-→ Frontend builds instruction: withdraw()
-→ Anchor validates: signer == campaign.owner AND campaign.is_closed == true
-→ SOL transferred from PDA vault to owner wallet
+Deadline passes (no separate close transaction needed)
+→ Campaign owner clicks "Withdraw Funds"
+→ Wallet Standard prompts to sign
+→ Frontend builds instruction via Codama client: withdraw()
+→ Anchor validates inline:
+    signer == campaign.owner (has_one)
+    Clock::get()?.unix_timestamp >= campaign.deadline
+    !campaign.withdrawn
+→ Full Vault PDA balance transferred to owner wallet (System Program CPI —
+  the vault holds no account data, so it can be drained to zero cleanly)
 → campaign.withdrawn set to true
-→ Frontend re-reads PDA → shows withdrawn state
+→ Frontend re-reads PDA → shows withdrawn state, disables the button
 ```
 
 ---
@@ -226,33 +289,55 @@ Campaign owner clicks "Withdraw Funds"
 
 ```rust
 #[account]
-pub struct CampaignAccount {
-    pub owner: Pubkey,          // campaign creator's wallet address
-    pub title: String,          // max 50 chars
-    pub description: String,    // max 500 chars
-    pub image_cid: String,      // IPFS CID of the campaign cover image
-    pub goal: u64,              // target amount in lamports
-    pub total_raised: u64,      // total SOL donated so far in lamports
-    pub deadline: i64,          // Unix timestamp — campaign closes after this
-    pub is_closed: bool,        // true once deadline has passed
-    pub withdrawn: bool,        // true once owner has withdrawn funds
-    pub bump: u8,               // PDA canonical bump
+#[derive(InitSpace)]
+pub struct UserProfile {
+    pub owner: Pubkey,           // wallet this profile belongs to
+    pub campaign_count: u64,     // number of campaigns this wallet has created — also the next campaign_id
+    pub bump: u8,
 }
 
 #[account]
+#[derive(InitSpace)]
+pub struct CampaignAccount {
+    pub owner: Pubkey,           // campaign creator's wallet address
+    pub campaign_id: u64,        // this owner's Nth campaign — part of the PDA seed
+    #[max_len(50)]
+    pub title: String,
+    #[max_len(500)]
+    pub description: String,
+    #[max_len(64)]
+    pub image_cid: String,       // IPFS CID of the campaign cover image
+    pub goal: u64,                // target amount in lamports
+    pub total_raised: u64,       // total SOL donated so far in lamports
+    pub deadline: i64,            // Unix timestamp — no donations accepted after this
+    pub withdrawn: bool,          // true once owner has withdrawn funds
+    pub vault_bump: u8,
+    pub bump: u8,
+}
+
+// The Vault PDA holds no Anchor account data — it is a plain system-owned
+// account tracked only by its address and lamport balance. This is what
+// makes withdrawal a clean CPI transfer with no stranded rent.
+
+#[account]
+#[derive(InitSpace)]
 pub struct DonationRecord {
-    pub campaign: Pubkey,       // campaign PDA this donation belongs to
-    pub donor: Pubkey,          // donor's wallet address
-    pub amount: u64,            // SOL donated in lamports
-    pub timestamp: i64,         // Unix timestamp of donation
-    pub bump: u8,               // PDA canonical bump
+    pub campaign: Pubkey,          // campaign PDA this donation belongs to
+    pub donor: Pubkey,              // donor's wallet address
+    pub total_amount: u64,         // cumulative SOL donated to this campaign, in lamports
+    pub donation_count: u32,       // how many separate donations this donor has made
+    pub first_donated_at: i64,     // Unix timestamp of first donation
+    pub last_donated_at: i64,      // Unix timestamp of most recent donation
+    pub bump: u8,
 }
 ```
 
 ### Instructions
 
 ```rust
-// Create a new campaign — derives a PDA, stores IPFS CID and deadline
+// Create a new campaign. Reads (and increments) UserProfile.campaign_count
+// to derive a fresh campaign_id — init_if_needed on UserProfile so a
+// wallet's first campaign doesn't need a separate setup transaction.
 pub fn create_campaign(
     ctx: Context<CreateCampaign>,
     title: String,
@@ -262,18 +347,15 @@ pub fn create_campaign(
     deadline: i64,
 ) -> Result<()>
 
-// Donate SOL — validates deadline, creates DonationRecord PDA
+// Donate SOL. Validates deadline, transfers lamports to the Vault PDA,
+// and accumulates into DonationRecord (init_if_needed).
 pub fn donate(
     ctx: Context<Donate>,
     amount: u64,
 ) -> Result<()>
 
-// Close campaign — permissionless, validates deadline has passed
-pub fn close_campaign(
-    ctx: Context<CloseCampaign>,
-) -> Result<()>
-
-// Withdraw funds — owner only, campaign must be closed first
+// Withdraw funds. Owner-only, deadline must have passed, can only be
+// called once. No separate close step — the deadline check is inline.
 pub fn withdraw(
     ctx: Context<Withdraw>,
 ) -> Result<()>
@@ -282,55 +364,83 @@ pub fn withdraw(
 ### PDA derivation
 
 ```
-Campaign PDA seeds:       ["campaign", owner_pubkey]
-→ Each wallet can create one campaign at a time
-→ PDA is deterministic — anyone can derive it from the owner's address
-→ PDA acts as both the data account and the SOL vault
+UserProfile PDA seeds:     ["user_profile", owner_pubkey]
+→ One per wallet. Tracks campaign_count so campaign_id is always derivable.
 
-DonationRecord PDA seeds: ["donation", campaign_pubkey, donor_pubkey]
-→ One DonationRecord per donor per campaign
-→ Stores donor address, amount, and timestamp on-chain
-→ Helius indexes these for the leaderboard and donation history
+Campaign PDA seeds:        ["campaign", owner_pubkey, campaign_id.to_le_bytes()]
+→ A wallet can create unlimited campaigns — each gets its own PDA.
+→ campaign_id comes from UserProfile.campaign_count at creation time.
+
+Vault PDA seeds:           ["vault", campaign_pubkey]
+→ Holds only lamports, no account data — a plain system-owned account.
+→ This is what campaign_id.to_le_bytes() and the vault split solve:
+  in the original single-PDA design, the same account held both data
+  and the SOL, which meant it could never be drained below the
+  rent-exempt minimum. Splitting them avoids that entirely.
+
+DonationRecord PDA seeds:  ["donation", campaign_pubkey, donor_pubkey]
+→ One record per donor per campaign — donations accumulate into it
+  rather than creating a new account (and a new rent payment) every time.
+→ Helius indexes writes to this account for the leaderboard.
 ```
 
 ### Anchor constraints
 
 ```rust
-// Donate — validates campaign is open and deadline not passed
+// Donate — validates deadline, accumulates into DonationRecord
 #[derive(Accounts)]
 pub struct Donate<'info> {
     #[account(
         mut,
-        seeds = [b"campaign", campaign.owner.as_ref()],
+        seeds = [b"campaign", campaign.owner.as_ref(), campaign.campaign_id.to_le_bytes().as_ref()],
         bump = campaign.bump,
-        constraint = !campaign.is_closed @ ErrorCode::CampaignClosed,
         constraint = Clock::get()?.unix_timestamp < campaign.deadline @ ErrorCode::DeadlinePassed,
     )]
     pub campaign: Account<'info, CampaignAccount>,
+
+    /// CHECK: data-less vault PDA, validated by seeds only
     #[account(
-        init,
+        mut,
+        seeds = [b"vault", campaign.key().as_ref()],
+        bump = campaign.vault_bump,
+    )]
+    pub vault: UncheckedAccount<'info>,
+
+    #[account(
+        init_if_needed,
         payer = donor,
         space = 8 + DonationRecord::INIT_SPACE,
         seeds = [b"donation", campaign.key().as_ref(), donor.key().as_ref()],
         bump,
     )]
     pub donation_record: Account<'info, DonationRecord>,
+
     #[account(mut)]
     pub donor: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
 
-// Withdraw — owner check + campaign must be closed
+// Withdraw — owner check, deadline check, single-use check, all inline
 #[derive(Accounts)]
 pub struct Withdraw<'info> {
     #[account(
         mut,
-        seeds = [b"campaign", owner.key().as_ref()],
+        seeds = [b"campaign", owner.key().as_ref(), campaign.campaign_id.to_le_bytes().as_ref()],
         bump = campaign.bump,
         has_one = owner,
-        constraint = campaign.is_closed @ ErrorCode::CampaignStillActive,
+        constraint = Clock::get()?.unix_timestamp >= campaign.deadline @ ErrorCode::DeadlineNotReached,
+        constraint = !campaign.withdrawn @ ErrorCode::AlreadyWithdrawn,
     )]
     pub campaign: Account<'info, CampaignAccount>,
+
+    /// CHECK: data-less vault PDA, validated by seeds only
+    #[account(
+        mut,
+        seeds = [b"vault", campaign.key().as_ref()],
+        bump = campaign.vault_bump,
+    )]
+    pub vault: UncheckedAccount<'info>,
+
     #[account(mut)]
     pub owner: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -341,28 +451,18 @@ pub struct Withdraw<'info> {
 
 ## 8. Pages & Routes
 
-### Marketing site — `trustfund.cc`
+Single Next.js app. Public pages are readable without a wallet; write actions (create, donate, withdraw) require a Wallet Standard connection.
 
-Static pages — no wallet required. Purpose is to explain the product and funnel visitors to the app.
+| Route             | Access          | Description                                                                                                                      |
+| ----------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `/`               | Public          | Landing (product pitch, how it works, featured campaigns, connect wallet button)                                                 |
+| `/campaigns`      | Public          | Browse all campaigns (cover images, progress bars, deadline countdown)                                                           |
+| `/campaigns/[id]` | Public          | Campaign detail (cover image, description, goal, total raised, donate form, deadline). `id` is the campaign PDA's base58 address |
+| `/leaderboard`    | Public          | Donor leaderboard, ranked by total SOL donated. Click a donor to open a panel with their per-campaign totals                     |
+| `/create`         | Wallet required | Create campaign (title, description, cover image upload to IPFS, SOL goal, deadline picker)                                      |
+| `/dashboard`      | Wallet required | Owner dashboard (campaigns created by connected wallet, withdraw button per eligible campaign)                                   |
 
-| Route | Description                                                          |
-| ----- | -------------------------------------------------------------------- |
-| `/`   | Hero section — product pitch, how it works, CTA → `app.trustfund.cc` |
-
-### App — `app.trustfund.cc`
-
-Full dApp — public pages are readable without a wallet. Write actions (create, donate, withdraw) require wallet connection.
-
-| Route             | Access          | Description                                                                                                                                               |
-| ----------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/`               | Public          | Home — featured campaigns, hero section, connect wallet button                                                                                            |
-| `/campaigns`      | Public          | Browse all active campaigns — cover images, progress bars, deadline countdown                                                                             |
-| `/campaigns/[id]` | Public          | Campaign detail — cover image, description, goal, total raised, donate form, deadline                                                                     |
-| `/leaderboard`    | Public          | Donor leaderboard — ranked by total SOL donated. Click any donor address to open a detail panel showing all campaigns donated to, amounts, and timestamps |
-| `/create`         | Wallet required | Create campaign — title, description, cover image upload to IPFS, SOL goal, deadline picker                                                               |
-| `/dashboard`      | Wallet required | Owner dashboard — campaigns created by connected wallet, close button, withdraw button                                                                    |
-
-> **Note:** There is no traditional auth — wallet connection is the identity. If no wallet is connected and a user attempts a write action, they see a "Connect wallet to continue" prompt inline — not a redirect.
+> **No traditional auth.** Wallet connection is the identity. A user attempting a write action without a wallet connected sees an inline "Connect wallet to continue" prompt. Not a redirect.
 
 ---
 
@@ -370,82 +470,84 @@ Full dApp — public pages are readable without a wallet. Write actions (create,
 
 ```
 trustfund/
-├── program/                              # Anchor smart contract
+├── program/                                # Anchor smart contract
 │   ├── programs/
 │   │   └── trustfund/
 │   │       └── src/
-│   │           └── lib.rs                # All Anchor instructions
+│   │           ├── lib.rs                  # Program entrypoint, re-exports
+│   │           ├── state.rs                # UserProfile, CampaignAccount, DonationRecord
+│   │           ├── instructions/
+│   │           │   ├── create_campaign.rs
+│   │           │   ├── donate.rs
+│   │           │   └── withdraw.rs
+│   │           └── errors.rs
 │   ├── tests/
-│   │   └── trustfund.ts                  # Anchor integration tests (Mocha + Chai)
-│   ├── Anchor.toml                       # Program ID, cluster, wallet config
+│   │   ├── litesvm/                        # Rust unit tests — clock-warp deadline cases
+│   │   └── ts/                             # Surfpool integration tests
+│   ├── Anchor.toml
 │   └── Cargo.toml
 │
-├── apps/
-│   ├── marketing/                        # Static marketing site (trustfund.cc)
-│   │   ├── app/
-│   │   │   ├── layout.tsx
-│   │   │   └── page.tsx                  # / — hero, how it works, CTA
-│   │   ├── components/
-│   │   │   ├── Hero.tsx
-│   │   │   ├── HowItWorks.tsx
-│   │   │   └── Navbar.tsx
-│   │   └── package.json
-│   │
-│   └── web/                              # Next.js 14 dApp (app.trustfund.cc)
-│       ├── app/
-│       │   ├── layout.tsx                # Root layout — Wallet Adapter providers
-│       │   ├── page.tsx                  # / — home, featured campaigns
-│       │   ├── api/
-│       │   │   ├── upload/
-│       │   │   │   └── route.ts          # Server-side IPFS upload via Pinata
-│       │   │   └── helius/
-│       │   │       └── webhook/
-│       │   │           └── route.ts      # Helius webhook handler — verify + index events
-│       │   ├── campaigns/
-│       │   │   ├── page.tsx              # /campaigns — browse all
-│       │   │   └── [id]/
-│       │   │       └── page.tsx          # /campaigns/[id] — detail + donate
-│       │   ├── leaderboard/
-│       │   │   └── page.tsx              # /leaderboard — donor rankings + detail panel
-│       │   ├── create/
-│       │   │   └── page.tsx              # /create — campaign creation form
-│       │   └── dashboard/
-│       │       └── page.tsx              # /dashboard — owner campaigns + actions
-│       ├── components/
-│       │   ├── WalletProvider.tsx        # Wallet Adapter + RPC provider setup
-│       │   ├── CampaignCard.tsx          # Campaign card — cover image, progress bar, deadline
-│       │   ├── DonateForm.tsx            # SOL donation form
-│       │   ├── CreateCampaignForm.tsx    # Campaign creation — image upload + all fields
-│       │   ├── ConnectWalletButton.tsx   # Phantom connect button
-│       │   ├── ProgressBar.tsx           # SOL raised / goal visual
-│       │   ├── DeadlineCountdown.tsx     # Countdown timer to campaign deadline
-│       │   ├── DonorLeaderboard.tsx      # Ranked donor list with total amounts
-│       │   └── DonorDetailPanel.tsx      # Slide-out panel — donor's full campaign history
-│       ├── lib/
-│       │   ├── anchor.ts                 # Anchor program client — load IDL
-│       │   ├── idl.json                  # Generated IDL from Anchor build
-│       │   ├── pinata.ts                 # Pinata SDK setup — server-side only
-│       │   ├── helius.ts                 # Helius client — query indexed events
-│       │   └── utils.ts                  # lamports ↔ SOL, timestamp, CID → URL helpers
-│       ├── hooks/
-│       │   ├── useCampaigns.ts           # Fetch all CampaignAccount PDAs
-│       │   ├── useCampaign.ts            # Fetch single campaign PDA by ID
-│       │   ├── useLeaderboard.ts         # Fetch donor rankings from Helius index
-│       │   ├── useDonorHistory.ts        # Fetch donation history for a wallet address
-│       │   └── useAnchorProgram.ts       # Return connected Anchor program instance
-│       └── package.json
+├── app/                                    # Next.js 16 App Router
+│   ├── layout.tsx                          # Root layout — Kit client + wallet providers
+│   ├── page.tsx                            # / — landing, featured campaigns
+│   ├── api/
+│   │   ├── upload/
+│   │   │   └── route.ts                    # Server-side IPFS upload via Pinata
+│   │   └── helius/
+│   │       └── webhook/
+│   │           └── route.ts                # Helius webhook handler — verify + write to Postgres
+│   ├── campaigns/
+│   │   ├── page.tsx                        # /campaigns — browse all
+│   │   └── [id]/
+│   │       └── page.tsx                    # /campaigns/[id] — detail + donate
+│   ├── leaderboard/
+│   │   └── page.tsx                        # /leaderboard — donor rankings + detail panel
+│   ├── create/
+│   │   └── page.tsx                        # /create — campaign creation form
+│   └── dashboard/
+│       └── page.tsx                        # /dashboard — owner campaigns + withdraw
+│
+├── components/
+│   ├── WalletProvider.tsx                  # @solana/react provider setup
+│   ├── CampaignCard.tsx
+│   ├── DonateForm.tsx
+│   ├── CreateCampaignForm.tsx
+│   ├── ConnectWalletButton.tsx
+│   ├── ProgressBar.tsx
+│   ├── DeadlineCountdown.tsx
+│   ├── DonorLeaderboard.tsx
+│   └── DonorDetailPanel.tsx
+│
+├── lib/
+│   ├── kit.ts                              # Solana Kit client setup, Helius RPC endpoint
+│   ├── generated/                          # Codama-generated client — do not hand-edit
+│   ├── pinata.ts                           # Pinata SDK setup — server-side only
+│   ├── db/
+│   │   ├── schema.ts                       # Drizzle schema — campaigns, donations tables
+│   │   └── client.ts                       # Drizzle + Supabase connection
+│   └── utils.ts                            # lamports ↔ SOL, timestamp, CID → URL helpers
+│
+├── hooks/
+│   ├── useCampaigns.ts                     # Fetch all CampaignAccount PDAs (with DB-first, RPC-fallback)
+│   ├── useCampaign.ts                      # Fetch single campaign PDA by address
+│   ├── useLeaderboard.ts                   # Fetch donor rankings from Postgres
+│   └── useDonorHistory.ts                  # Fetch a donor's per-campaign totals
+│
+├── scripts/
+│   └── backfill.ts                         # Replays full program history from RPC into Postgres
 │
 ├── .github/
 │   └── workflows/
-│       └── ci.yml                        # Lint + type-check on every push
-├── turbo.json                            # Turborepo config
-├── package.json                          # Root workspace
+│       └── ci.yml                          # Lint, type-check, Codama-client-is-current check
+├── codama.config.ts                        # Codama config — Anchor IDL → Kit client
+├── drizzle.config.ts
+├── package.json
 └── .env.example
 ```
 
-> **Two Vercel deployments from one repo:** Create two Vercel projects pointing at the same GitHub repo — one for `apps/marketing` pointed at `trustfund.cc` and one for `apps/web` pointed at `app.trustfund.cc`. Turborepo builds only what changed.
+> **IPFS uploads are server-side only.** Pinata keys live in `app/api/upload/route.ts`. Never exposed to the browser. The client posts the image file to `/api/upload` and gets back a CID.
 
-> **IPFS uploads are server-side only.** Pinata secret keys live in `app/api/upload/route.ts` — never exposed to the browser. The client posts the image file to `/api/upload` and gets back a CID.
+> **The Codama client is generated, not written.** Run the generation script after every `anchor build`. CI fails if `lib/generated/` is out of sync with the committed IDL, so a stale client can't silently ship.
 
 ---
 
@@ -454,240 +556,212 @@ trustfund/
 ```bash
 # ── Solana ────────────────────────────────────────────
 NEXT_PUBLIC_SOLANA_NETWORK="devnet"
-NEXT_PUBLIC_SOLANA_RPC_URL="https://api.devnet.solana.com"
-NEXT_PUBLIC_PROGRAM_ID=""             # Deployed program ID from Anchor.toml
+NEXT_PUBLIC_SOLANA_RPC_URL=""          # Helius devnet RPC URL — do not use the public devnet endpoint
+NEXT_PUBLIC_PROGRAM_ID=""              # Deployed program ID from Anchor.toml
 
 # ── IPFS (Pinata) ─────────────────────────────────────
-PINATA_API_KEY=""                     # Server-side only — never expose to browser
-PINATA_SECRET_API_KEY=""              # Server-side only — never expose to browser
-NEXT_PUBLIC_PINATA_GATEWAY=""         # Your Pinata gateway URL for reading images
+PINATA_JWT=""                          # Server-side only — never expose to browser
+NEXT_PUBLIC_PINATA_GATEWAY=""          # Your Pinata gateway URL for reading images
 
 # ── Helius ────────────────────────────────────────────
-HELIUS_API_KEY=""                     # Helius API key — for webhook + RPC access
-HELIUS_WEBHOOK_SECRET=""              # Webhook secret for verifying Helius payloads
+HELIUS_API_KEY=""                      # Helius API key — RPC + webhook access
+HELIUS_WEBHOOK_SECRET=""               # Webhook secret for verifying Helius payloads
+
+# ── Database (Supabase) ───────────────────────────────
+DATABASE_URL=""                        # Supabase Postgres connection string, for Drizzle
 
 # ── App ───────────────────────────────────────────────
-NEXT_PUBLIC_MARKETING_URL="http://localhost:3001"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 ```
 
-> **`PINATA_API_KEY` and `PINATA_SECRET_API_KEY` are server-side only.** They are used exclusively in `app/api/upload/route.ts` and must never appear in any `NEXT_PUBLIC_*` variable. Everything else is safe to expose — they reference public devnet endpoints and gateways.
+> **`PINATA_JWT`, `HELIUS_API_KEY`, `HELIUS_WEBHOOK_SECRET` and `DATABASE_URL` are server-side only.**
+
+> They must never appear in a `NEXT_PUBLIC_*` variable. Everything else is safe to expose, devnet program IDs and gateway URLs carry no funds risk.
 
 ---
 
 ## 11. Project Building Steps
 
-1. **Set up the Anchor project and write the program.**
-   - Initialise Anchor workspace : `anchor init trustfund`
-   - Write `CampaignAccount` struct : include `image_cid`, `deadline`, `is_closed`, `withdrawn` fields
-   - Write `DonationRecord` struct : donor pubkey, amount, timestamp, bump
-   - Write `create_campaign` instruction : PDA derivation with seeds `["campaign", owner]`, store all fields including CID and deadline
-   - Write `donate` instruction : validates deadline and `is_closed`, transfers SOL via CPI, creates `DonationRecord` PDA
-   - Write `close_campaign` instruction : permissionless, validates `clock >= deadline`, sets `is_closed = true`
-   - Write `withdraw` instruction : `has_one = owner` + `campaign.is_closed == true` constraints
-   - Write Anchor integration tests for all four instructions including edge cases (donate after deadline, withdraw before close)
-   - Deploy to devnet : `anchor deploy --provider.cluster devnet`
-   - Copy generated IDL to `apps/web/lib/idl.json`
+A step-by-step record of the TrustFund build, grouped into phases.
 
-2. **Set up the Turborepo monorepo and Next.js apps.**
-   - Initialise Turborepo workspace : `apps/marketing`, `apps/web`
-   - Initialise `apps/marketing` : `npx create-next-app@latest marketing --typescript --tailwind --app`
-   - Initialise `apps/web` : `npx create-next-app@latest web --typescript --tailwind --app`
-   - Install Solana packages in `apps/web` : `@solana/web3.js`, `@solana/wallet-adapter-react`, `@solana/wallet-adapter-wallets`, `@coral-xyz/anchor`
-   - Install Pinata SDK in `apps/web` : `@pinata/sdk`
-   - Set up `WalletProvider.tsx` : wrap root layout with Wallet Adapter providers
-   - Set up `anchor.ts` : load IDL, create Anchor program client from connected wallet
-   - Build `app/api/upload/route.ts` : server-side Pinata upload, returns CID to client
-   - Build `app/api/helius/webhook/route.ts` : verify Helius signature, parse and store indexed events
-
-3. **Build pages in this order.**
-   - `/campaigns` : fetch all `CampaignAccount` PDAs, render `CampaignCard` grid with IPFS cover images
-   - `/campaigns/[id]` : fetch single PDA, render cover image, progress bar, deadline countdown, `DonateForm`
-   - `/create` : form with image upload (POST to `/api/upload`), calls `create_campaign` on submit
-   - `/dashboard` : filter campaigns by connected wallet, show close and withdraw buttons
-   - `/leaderboard` : fetch donor rankings from Helius index, render `DonorLeaderboard` + `DonorDetailPanel`
-   - `/` (app home) : featured campaigns, hero CTA
-   - `apps/marketing /` : landing page, how it works, CTA to `app.trustfund.cc`
-
-4. **Wire up all transactions.**
-   - Create campaign : upload image to `/api/upload` → get CID → build instruction → send → redirect to campaign page
-   - Donate : build instruction → send → refetch PDA → update progress bar
-   - Close campaign : build instruction → send → update dashboard button state
-   - Withdraw : build instruction → send → show withdrawn state on dashboard
-
-5. **Set up Helius indexing.**
-   - Create a Helius webhook in the Helius dashboard : listen to your program ID for all transactions
-   - Set webhook URL to `app.trustfund.cc/api/helius/webhook` (or ngrok URL for local testing)
-   - Build the webhook handler : verify `HELIUS_WEBHOOK_SECRET`, parse events
-   - Build `useLeaderboard` and `useDonorHistory` hooks that query indexed data via Helius enhanced APIs
-
-6. **Test, debug and deploy.**
-   - Test all four instructions end-to-end on devnet with a real Phantom wallet
-   - Test IPFS upload : confirm images load from Pinata gateway on campaign pages
-   - Test Helius webhook : confirm donations appear in leaderboard after indexing
-   - Deploy `apps/marketing` to Vercel : point `trustfund.cc` domain, set env vars
-   - Deploy `apps/web` to Vercel : point `app.trustfund.cc` domain, set all env vars
-   - Full smoke test on production : create → donate → close → withdraw
+1. Logo and brand identity
+2. Core UI component library
+3. Project scaffold & repo setup
+4. Anchor program scaffold & state design
+5. Deploy TrustFund program (campaign, vault and donation instructions)
+6. Codama client generation and Solana Kit wiring
+7. Database schema setup
+8. Landing page
+9. Wallet Standard connect flow
+10. Campaign dashboard route
+11. Discover / browse campaigns page
+12. IPFS cover image upload integration
+13. Campaign creation flow
+14. Campaign detail page & progress tracking
+15. Donation flow
+16. Owner withdraw flow
+17. Refund flow (optional)
+18. Helius webhook indexer
+19. Backfill script for indexer history
+20. Donor leaderboard and detail panel
+21. Cross-page polish and QA
+22. Devnet validation and smoke test
+23. Mainnet deployment (optional)
+24. Demo prep & submission
 
 ---
 
-## 12. How to Contribute
+## 12. How to Contribute. ⚡👋
 
-- 🎨 Any improvements to the design & UI are welcome.
-- 🔨 Try to break the app by testing it on devnet to find any bugs. If you find any, check if there is an issue already open for it. If there is none, then report it.
-- 💡 All code must be written in **TypeScript** — no `any` types.
-- 📱 For UI changes, test on both desktop and mobile viewport sizes before submitting.
+- 🔨 Try to break the app by testing real flows and edge cases. If you find a bug, check whether an issue already exists before opening a new one.
+- 🎨 Improvements to the design and UI are welcome.
+- 💡 Keep application code strongly typed with TypeScript and validate API inputs where appropriate.
+- 📱 For UI changes, test both desktop and mobile viewport sizes before submitting.
+- 🔐 Never commit private keys, API keys, signing keys, JWTs, `.env.local` files or other secrets.
 
-### 🔃 Steps to be followed in order to make valid contributions to this repo.
+### 🔃 Steps to make a valid contribution
 
-1. Fork the [TrustFund](https://github.com/mrinnnmoy/trustfund) repo by clicking on the fork button on the top of the page. This will create a copy of this repository in your account.
+1. **Fork the repository**
 
-2. **Clone the forked repository**
+   Fork the [TrustFund](https://github.com/mrinnnmoy/TrustFund) repository to your GitHub account.
 
-   ```bash
-   git clone "https://github.com/<your-github-username>/trustfund"
-   ```
-
-   Then set up your local environment:
-   - Download and install **Node.js v18** or higher
-   - Download and install **Git**
-   - Download and install **Rust** : `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
-   - Download and install **Solana CLI** : `sh -c "$(curl -sSfL https://release.solana.com/stable/install)"`
-   - Download and install **Anchor CLI** : `cargo install --git https://github.com/coral-xyz/anchor avm --locked && avm install latest && avm use latest`
-   - Download and install **pnpm** : `npm install -g pnpm`
-   - Install a Solana wallet browser extension : [Phantom](https://phantom.app) recommended
-   - Switch your Phantom wallet to **devnet** : Settings → Developer Settings → change network to devnet
-
-   Navigate into the project and install dependencies:
+2. **Clone your fork**
 
    ```bash
-   cd trustfund
-   pnpm install
+   git clone https://github.com/<your-github-username>/TrustFund.git
+   cd TrustFund
    ```
 
-   Copy the example env file and fill in your values:
+3. **Create a feature branch**
 
-   ```bash
-   cp .env.example .env
-   ```
-
-   Fund your devnet wallet with test SOL:
-
-   ```bash
-   solana airdrop 2 --url devnet
-   ```
-
-   Build and deploy the Anchor program to devnet:
-
-   ```bash
-   cd program
-   anchor build
-   anchor deploy --provider.cluster devnet
-   ```
-
-   Copy the deployed Program ID into your `.env` as `NEXT_PUBLIC_PROGRAM_ID`.
-
-   Copy the generated IDL into the frontend:
-
-   ```bash
-   cp program/target/idl/trustfund.json apps/web/lib/idl.json
-   ```
-
-   Start all apps in development mode:
-
-   ```bash
-   cd ..
-   pnpm dev
-   ```
-
-   After running `pnpm dev` you should have:
-   - Marketing site at `http://localhost:3001`
-   - App at `http://localhost:3000`
-
-   **Setting up Pinata (IPFS) locally:**
-   1. Create a free account at [pinata.cloud](https://pinata.cloud)
-   2. Go to **API Keys** → **New Key**
-   3. Copy **API Key** and **Secret API Key** into your `.env` as `PINATA_API_KEY` and `PINATA_SECRET_API_KEY`
-   4. Copy your gateway URL into `NEXT_PUBLIC_PINATA_GATEWAY`
-
-   **Setting up Helius locally:**
-   1. Create a free account at [helius.dev](https://helius.dev)
-   2. Create a new project → copy your **API Key** into `.env` as `HELIUS_API_KEY`
-   3. For webhook testing locally, use [ngrok](https://ngrok.com) to expose your local server — `ngrok http 3000` — and set the webhook URL in the Helius dashboard to your ngrok URL + `/api/helius/webhook`
-
-3. **Make necessary changes & commit those changes.**
-
-   Remember, **never push anything directly to the `main` branch.**
-
-   Always switch your branch to `develop` first:
+   Start from the latest `develop` branch:
 
    ```bash
    git checkout develop
+   git pull origin develop
+   git checkout -b <type>/<short-description>
    ```
 
-   Verify your current branch:
+   Example:
 
    ```bash
-   git branch
+   git checkout -b fix/mobile-campaign-card
    ```
 
-   It should show `* develop`
+4. **Set up the web application**
 
-   Add your changes:
+   TrustFund is a single Next.js app at the repository root. There's no `app/web` split.
+
+   Install dependencies:
 
    ```bash
-   git add files-you-edited
+   pnpm install
    ```
 
-   If there are multiple files:
+   Create your local environment file:
 
    ```bash
-   git add .
+   cp .env.example .env.local
    ```
 
-   Create a commit message following the [Conventional Commits](https://www.conventionalcommits.org) standard:
+   Configure the required environment variables locally.
+
+   > Never commit the populated `.env.local` file.
+
+   Start the development server:
+
+   ```bash
+   pnpm dev
+   ```
+
+   The app is available at:
+
+   ```text
+   http://localhost:3000
+   ```
+
+5. **Set up the smart contract when needed**
+
+   If your contribution affects the Anchor program, open another terminal from the repository root and move to:
+
+   ```bash
+   cd program
+   ```
+
+   Make sure Anchor CLI (1.1.x) and the Solana CLI are installed, then run:
+
+   ```bash
+   anchor build
+   anchor test
+   ```
+
+   `anchor test` runs the LiteSVM unit tests (including clock-warp deadline cases) and the Surfpool TypeScript integration tests.
+
+6. **Make your changes**
+
+   Keep changes focused and avoid modifying unrelated files.
+
+   Before committing web application changes, run from the repo root:
+
+   ```bash
+   pnpm lint
+   pnpm typecheck
+   pnpm build
+   ```
+
+   If the program was modified, also run from `program`:
+
+   ```bash
+   anchor test
+   ```
+
+7. **Commit your changes**
+
+   Stage only the files you changed:
+
+   ```bash
+   git add <files-you-edited>
+   ```
+
+   Use a Conventional Commit message:
 
    ```bash
    git commit -m "<type>: <short description>"
    ```
 
-   | Prefix      | Use for                                          |
-   | ----------- | ------------------------------------------------ |
-   | `feat:`     | A new feature                                    |
-   | `fix:`      | A bug fix                                        |
-   | `docs:`     | Documentation changes only                       |
-   | `style:`    | Formatting, missing semicolons — no logic change |
-   | `refactor:` | Code restructure — no feature or bug change      |
-   | `test:`     | Adding or updating tests                         |
-   | `chore:`    | Build process, dependency updates, tooling       |
+   | Prefix      | Use for                                       |
+   | ----------- | --------------------------------------------- |
+   | `feat:`     | A new feature                                 |
+   | `fix:`      | A bug fix                                     |
+   | `docs:`     | Documentation changes                         |
+   | `style:`    | Formatting with no behavior change            |
+   | `refactor:` | Code restructure without a feature/bug change |
+   | `test:`     | Adding or updating tests                      |
+   | `chore:`    | Build, dependency or tooling work             |
 
-   Run lint and type checks before pushing — the CI pipeline will reject failures:
-
-   ```bash
-   pnpm lint
-   pnpm typecheck
-   ```
-
-4. **Push changes to GitHub.**
+8. **Push your branch**
 
    ```bash
-   git push origin develop
+   git push origin <your-branch-name>
    ```
 
-5. **Create a Pull Request. 👋**
+9. **Create a Pull Request. 👋**
 
-   Go to your repository on GitHub — you'll see a **Compare & pull request** button. Click it and write a summary of what changes you made (attach screenshots for any UI changes). I will review your code and merge it if it passes all checks. ❤️
+   Open a pull request against the TrustFund `develop` branch and describe your changes clearly.
 
-   **Before opening a PR, always check:**
-   - [ ] `pnpm lint` passes with no errors
-   - [ ] `pnpm typecheck` passes with no errors
-   - [ ] The feature works correctly at `http://localhost:3000` (app) and `http://localhost:3001` (marketing) if applicable
-   - [ ] All Anchor instructions involved were tested on devnet with a real Phantom wallet
-   - [ ] You've commented on the related issue so others know it's being worked on
+   **Before opening a PR, check:**
+   - [ ] `pnpm lint` passes
+   - [ ] `pnpm typecheck` passes
+   - [ ] `pnpm build` passes
+   - [ ] `anchor test` passes when the Anchor program is affected
+   - [ ] The relevant feature works locally
+   - [ ] UI changes have been checked at appropriate viewport sizes
+   - [ ] No secrets or local environment files are included in the diff
+   - [ ] The PR contains only relevant changes
 
    **Getting help:**
-   - Open a [GitHub Discussion](https://github.com/mrinnnmoy/trustfund/discussions) for general questions
+   - Open a [GitHub Discussion](https://github.com/mrinnnmoy/TrustFund/discussions) for general questions
    - Comment directly on the issue you're working on
-   - Reach out on [Twitter](https://twitter.com/mrinnnmoy)
+   - Reach out on [Twitter](https://x.com/mrinnnmoy)
 
 ---
