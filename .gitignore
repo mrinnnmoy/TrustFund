@@ -23,3 +23,13 @@ contracts/lib/
 *.log
 .vercel
 EOF
+# Next.js and TypeScript
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# Local environment files
+.env
+.env.*
+!.env.example
