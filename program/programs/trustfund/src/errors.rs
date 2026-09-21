@@ -10,4 +10,10 @@ pub enum TrustFundError {
 
     #[msg("This campaign's funds have already been withdrawn.")]
     AlreadyWithdrawn,
+
+    #[msg("Donation amount must be greater than zero.")]
+    InvalidAmount,
+
+    #[msg("An amount calculation overflowed.")]
+    MathOverflow,
 }
