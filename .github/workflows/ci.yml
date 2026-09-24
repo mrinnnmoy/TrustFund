@@ -54,6 +54,16 @@ jobs:
           anchor build
           anchor test --skip-deploy
 
+      - name: Normalize IDL program address
+        run: |
+          node -e '
+            const fs = require("fs");
+            const path = "program/target/idl/trustfund.json";
+            const idl = JSON.parse(fs.readFileSync(path, "utf8"));
+            idl.address = "AYsmGT97ZmgfJmzBxLQ7om8sMGkiCTLNZEf9otevg1g3";
+            fs.writeFileSync(path, JSON.stringify(idl, null, 2) + "\n");
+          '
+
       - uses: pnpm/action-setup@v6
         with:
           version: 12.4.2
