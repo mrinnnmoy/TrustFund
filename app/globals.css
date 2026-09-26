@@ -10,3 +10,9 @@ body {
 h1, h2, h3 {
   font-family: var(--font-display);
 }
+
+a,
+button,
+[role="button"] {
+  cursor: pointer;
+}
