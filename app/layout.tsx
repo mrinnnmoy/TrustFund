@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Manrope, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
+import { WalletProvider } from "@/components/WalletProvider";
+import { Header } from "@/components/Header";
 
 const manrope = Manrope({
   subsets: ["latin"],
@@ -28,7 +30,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${manrope.variable} ${plexMono.variable}`}>
-        {children}
+        <WalletProvider>
+          <Header />
+          {children}
+        </WalletProvider>
       </body>
     </html>
   );

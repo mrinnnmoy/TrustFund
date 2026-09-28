@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { Button } from "./ui/Button";
+import { ConnectWalletButton } from "./ConnectWalletButton";
 
 const navItems = [
   { label: "Home", href: "/" },
@@ -45,11 +45,7 @@ export function LandingHeader() {
         </div>
 
         <div className="hidden md:block">
-          <Link href="/create">
-            <Button variant="primary" className="px-6">
-              Start a campaign
-            </Button>
-          </Link>
+          <ConnectWalletButton />
         </div>
 
         <button
@@ -98,15 +94,9 @@ export function LandingHeader() {
             ))}
           </nav>
 
-          <Link
-            href="/create"
-            onClick={() => setMenuOpen(false)}
-            className="mt-5 block"
-          >
-            <Button variant="primary" className="w-full">
-              Start a campaign
-            </Button>
-          </Link>
+          <div className="mt-5">
+            <ConnectWalletButton className="w-full" />
+          </div>
         </div>
       )}
     </header>
